@@ -7,7 +7,7 @@ It can also generate an HTML report for quickly reviewing the current worklist.
 ## First-Time Setup
 
 ```powershell
-cd C:\Users\A25228\Documents\Mantis
+cd C:\path\to\mantis-report-watcher
 Copy-Item .\config.sample.json .\config.json
 powershell -ExecutionPolicy Bypass -File .\scripts\Set-MantisCredential.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1 -InitializeOnly
@@ -33,7 +33,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1 -Htm
 Report path:
 
 ```text
-C:\Users\A25228\Documents\Mantis\reports\mantis-items.html
+C:\path\to\mantis-report-watcher\reports\mantis-items.html
 ```
 
 Test Windows notification:
