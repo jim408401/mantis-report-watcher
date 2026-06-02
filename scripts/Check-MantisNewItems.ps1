@@ -89,6 +89,7 @@ function Get-StatusInfo {
     $reviewText = (New-Text @(0x5F85)) + "CR"
     $doneText = New-Text @(0x5DF2, 0x5B8C, 0x6210)
     $testText = New-Text @(0x6E2C, 0x8A66, 0x4E2D)
+    $otherText = New-Text @(0x5176, 0x4ED6)
 
     if ($status -match "feedback" -or $name.Contains($progressText)) {
         return [pscustomobject]@{ Key = "progress"; Order = 1; LabelText = $progressText; LabelHtml = "&#36914;&#34892;&#20013;"; Class = "status-progress"; Open = $false }
@@ -106,7 +107,25 @@ function Get-StatusInfo {
         return [pscustomobject]@{ Key = "testing"; Order = 5; LabelText = $testText; LabelHtml = "&#28204;&#35430;&#20013;"; Class = "status-testing"; Open = $false }
     }
 
-    return [pscustomobject]@{ Key = "other"; Order = 99; LabelText = $name; LabelHtml = [System.Net.WebUtility]::HtmlEncode($name); Class = "status-other"; Open = $false }
+    return [pscustomobject]@{ Key = "other"; Order = 99; LabelText = $otherText; LabelHtml = "&#20854;&#20182;"; Class = "status-other"; Open = $false }
+}
+
+function Get-StatusDefinitions {
+    $progressText = New-Text @(0x9032, 0x884C, 0x4E2D)
+    $assignedText = New-Text @(0x5DF2, 0x5206, 0x914D)
+    $reviewText = (New-Text @(0x5F85)) + "CR"
+    $doneText = New-Text @(0x5DF2, 0x5B8C, 0x6210)
+    $testText = New-Text @(0x6E2C, 0x8A66, 0x4E2D)
+    $otherText = New-Text @(0x5176, 0x4ED6)
+
+    return @(
+        [pscustomobject]@{ Key = "progress"; Order = 1; LabelText = $progressText; LabelHtml = "&#36914;&#34892;&#20013;"; Class = "status-progress"; Open = $false },
+        [pscustomobject]@{ Key = "assigned"; Order = 2; LabelText = $assignedText; LabelHtml = "&#24050;&#20998;&#37197;"; Class = "status-assigned"; Open = $false },
+        [pscustomobject]@{ Key = "review"; Order = 3; LabelText = $reviewText; LabelHtml = "&#24453; CR"; Class = "status-review"; Open = $false },
+        [pscustomobject]@{ Key = "done"; Order = 4; LabelText = $doneText; LabelHtml = "&#24050;&#23436;&#25104;"; Class = "status-done"; Open = $false },
+        [pscustomobject]@{ Key = "testing"; Order = 5; LabelText = $testText; LabelHtml = "&#28204;&#35430;&#20013;"; Class = "status-testing"; Open = $false },
+        [pscustomobject]@{ Key = "other"; Order = 99; LabelText = $otherText; LabelHtml = "&#20854;&#20182;"; Class = "status-other"; Open = $false }
+    )
 }
 
 function Get-CellHtml {
@@ -189,11 +208,143 @@ function Get-MantisItemsFromHtml {
             Category = Convert-CellText (Get-CellHtml -RowHtml $row -ColumnClass "column-category")
             Severity = Convert-CellText (Get-CellHtml -RowHtml $row -ColumnClass "column-severity")
             LastModified = Convert-CellText (Get-CellHtml -RowHtml $row -ColumnClass "column-last-modified")
+            TargetVersion = ""
+            DetailHtml = ""
             Url = $uri.AbsoluteUri
         }
     }
 
     $items | Sort-Object Id -Unique
+}
+
+function Convert-PlainTextToHtml {
+    param([string]$Text)
+
+    $encoded = [System.Net.WebUtility]::HtmlEncode($Text.Trim())
+    return ($encoded -replace "(`r`n|`n|`r)", "<br>")
+}
+
+function Convert-DetailBlockText {
+    param([string]$Html)
+
+    $text = $Html -replace '(?i)<br\s*/?>', "`n"
+    $text = $text -replace '(?i)</p\s*>', "`n"
+    $text = $text -replace '<[^>]+>', ''
+    $text = [System.Net.WebUtility]::HtmlDecode($text)
+    $text = $text -replace "`r`n", "`n"
+    $text = $text -replace "`r", "`n"
+    $text = $text -replace "[ `t]+`n", "`n"
+    $text = $text -replace "`n{3,}", "`n`n"
+    return $text.Trim()
+}
+
+function Convert-MantisDescriptionToHtml {
+    param([string]$DescriptionHtml)
+
+    if ([string]::IsNullOrWhiteSpace($DescriptionHtml)) {
+        return '<div class="detail-empty">No detail content.</div>'
+    }
+
+    $sections = New-Object System.Collections.Generic.List[string]
+    $liMatches = [regex]::Matches(
+        $DescriptionHtml,
+        '<li[^>]*>(?<value>.*?)</li>',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+
+    foreach ($liMatch in $liMatches) {
+        $block = $liMatch.Groups["value"].Value
+        $headingMatch = [regex]::Match(
+            $block,
+            '<h[1-6][^>]*>(?<value>.*?)</h[1-6]>',
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Singleline
+        )
+        $contentMatch = [regex]::Match(
+            $block,
+            '<(?:pre|code)[^>]*>(?<value>.*?)</(?:pre|code)>',
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Singleline
+        )
+
+        $heading = if ($headingMatch.Success) { Convert-CellText $headingMatch.Groups["value"].Value } else { "" }
+        $content = if ($contentMatch.Success) { Convert-DetailBlockText $contentMatch.Groups["value"].Value } else { Convert-CellText $block }
+
+        if ([string]::IsNullOrWhiteSpace($heading) -and [string]::IsNullOrWhiteSpace($content)) {
+            continue
+        }
+
+        $headingHtml = [System.Net.WebUtility]::HtmlEncode($heading)
+        $contentHtml = Convert-PlainTextToHtml $content
+        $sections.Add(@"
+              <section class="detail-section">
+                <h4>$headingHtml</h4>
+                <div class="detail-text">$contentHtml</div>
+              </section>
+"@)
+    }
+
+    if ($sections.Count -eq 0) {
+        $fallback = Convert-PlainTextToHtml (Convert-CellText $DescriptionHtml)
+        return @"
+              <section class="detail-section">
+                <div class="detail-text">$fallback</div>
+              </section>
+"@
+    }
+
+    return ($sections -join "`n")
+}
+
+function Get-MantisDetailFieldsFromHtml {
+    param([string]$Html)
+
+    $targetVersionMatch = [regex]::Match(
+        $Html,
+        '<td[^>]*class=["''][^"'']*\bbug-target-version\b[^"'']*["''][^>]*>(?<value>.*?)</td>',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+
+    $targetVersion = if ($targetVersionMatch.Success) {
+        Convert-CellText $targetVersionMatch.Groups["value"].Value
+    } else {
+        ""
+    }
+
+    $descriptionMatch = [regex]::Match(
+        $Html,
+        '<td[^>]*class=["''][^"'']*\bbug-description\b[^"'']*["''][^>]*>(?<value>.*?)</td>',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+    $detailHtml = if ($descriptionMatch.Success) {
+        Convert-MantisDescriptionToHtml $descriptionMatch.Groups["value"].Value
+    } else {
+        '<div class="detail-empty">No detail content.</div>'
+    }
+
+    return [pscustomobject]@{
+        TargetVersion = $targetVersion
+        DetailHtml = $detailHtml
+    }
+}
+
+function Add-MantisDetailFields {
+    param(
+        [object[]]$Items,
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session
+    )
+
+    foreach ($item in $Items) {
+        try {
+            $detailResponse = Invoke-WebRequest -Uri $item.Url -WebSession $Session -UseBasicParsing
+            $detail = Get-MantisDetailFieldsFromHtml -Html $detailResponse.Content
+            $item.TargetVersion = $detail.TargetVersion
+            $item.DetailHtml = $detail.DetailHtml
+        } catch {
+            $item.TargetVersion = ""
+            $item.DetailHtml = '<div class="detail-empty">Failed to load detail content.</div>'
+        }
+    }
+
+    return $Items
 }
 
 function New-MantisHtmlReport {
@@ -222,51 +373,96 @@ function New-MantisHtmlReport {
         }
     }
 
-    $groups = $viewItems |
-        Group-Object StatusKey |
-        Sort-Object { ($_.Group | Select-Object -First 1).StatusOrder }
+    $itemsByStatus = @{}
+    foreach ($viewItem in $viewItems) {
+        if (-not $itemsByStatus.ContainsKey($viewItem.StatusKey)) {
+            $itemsByStatus[$viewItem.StatusKey] = @()
+        }
+        $itemsByStatus[$viewItem.StatusKey] += $viewItem
+    }
+
+    $groups = foreach ($definition in Get-StatusDefinitions) {
+        $rawGroupItems = if ($itemsByStatus.ContainsKey($definition.Key)) {
+            @($itemsByStatus[$definition.Key])
+        } else {
+            @()
+        }
+        $groupItems = @($rawGroupItems)
+
+        [pscustomobject]@{
+            Key = $definition.Key
+            Order = $definition.Order
+            LabelText = $definition.LabelText
+            LabelHtml = $definition.LabelHtml
+            Class = $definition.Class
+            Open = $definition.Open
+            Items = $groupItems
+            ItemCount = @($groupItems).Count
+        }
+    }
 
     $summaryCards = foreach ($group in $groups) {
-        $first = $group.Group | Select-Object -First 1
 @"
-      <button class="metric-card metric-$($first.StatusKey)" type="button" onclick="openStatusSection('$($first.StatusKey)')">
+      <button class="metric-card metric-$($group.Key)" type="button" onclick="openStatusSection('$($group.Key)')">
         <div class="metric-bar"></div>
         <div class="metric-inner">
-          <div class="metric-num">$($group.Count)</div>
-          <div class="metric-label">$($first.StatusLabelHtml)</div>
+          <div class="metric-num">$($group.ItemCount)</div>
+          <div class="metric-label">$($group.LabelHtml)</div>
         </div>
       </button>
 "@
     }
 
     $sections = foreach ($group in $groups) {
-        $first = $group.Group | Select-Object -First 1
-        $headerClass = if ($first.StatusOpen) { "section-header" } else { "section-header collapsed" }
-        $bodyClass = if ($first.StatusOpen) { "section-body" } else { "section-body collapsed-body" }
-        $iconClass = if ($first.StatusOpen) { "chevron open" } else { "chevron" }
-        $rows = foreach ($viewItem in ($group.Group | Sort-Object {[int]$_.Item.Id})) {
+        $headerClass = if ($group.Open) { "section-header" } else { "section-header collapsed" }
+        $bodyClass = if ($group.Open) { "section-body" } else { "section-body collapsed-body" }
+        $iconClass = if ($group.Open) { "chevron open" } else { "chevron" }
+        $rows = foreach ($viewItem in (@($group.Items) | Sort-Object {[int]$_.Item.Id})) {
             $item = $viewItem.Item
             $id = [System.Net.WebUtility]::HtmlEncode($item.Id)
             $lastModified = [System.Net.WebUtility]::HtmlEncode($item.LastModified)
+            $targetVersion = [System.Net.WebUtility]::HtmlEncode($item.TargetVersion)
             $title = [System.Net.WebUtility]::HtmlEncode($item.Title)
             $url = [System.Net.WebUtility]::HtmlEncode($item.Url)
+            $detailId = "detail-$id"
+            $detailHtml = if ([string]::IsNullOrWhiteSpace($item.DetailHtml)) {
+                '<div class="detail-empty">No detail content.</div>'
+            } else {
+                $item.DetailHtml
+            }
 @"
           <tr>
             <td class="col-id"><a href="$url" target="_blank">#$id</a></td>
-            <td class="col-title">$title</td>
+            <td class="col-title"><button class="issue-title-button" type="button" onclick="toggleIssueDetail('$detailId')">$title</button></td>
+            <td class="col-target">$targetVersion</td>
             <td class="col-date">$lastModified</td>
+          </tr>
+          <tr id="$detailId" class="issue-detail-row hidden-detail">
+            <td colspan="4">
+              <div class="issue-detail-panel">
+$detailHtml
+              </div>
+            </td>
+          </tr>
+"@
+        }
+
+        if ($group.ItemCount -eq 0) {
+            $rows = @"
+          <tr>
+            <td colspan="4" class="empty-row">No items.</td>
           </tr>
 "@
         }
 
 @"
-    <section class="section" data-status="$($first.StatusKey)">
+    <section class="section" data-status="$($group.Key)">
       <button class="$headerClass" type="button" onclick="toggleSection(this)">
         <span class="section-left">
           <span class="$iconClass"></span>
-          <span class="pill $($first.StatusClass)">$($first.StatusLabelHtml)</span>
+          <span class="pill $($group.Class)">$($group.LabelHtml)</span>
         </span>
-        <span class="section-count"><strong>$($group.Count)</strong> &#31558;</span>
+        <span class="section-count"><strong>$($group.ItemCount)</strong> &#31558;</span>
       </button>
       <div class="$bodyClass">
         <table>
@@ -274,6 +470,7 @@ function New-MantisHtmlReport {
             <tr>
               <th>&#38917;&#30446;&#32232;&#34399;</th>
               <th>&#38917;&#30446;&#21517;&#31281;</th>
+              <th>&#30446;&#27161;&#29256;&#26412;</th>
               <th>&#26356;&#26032;&#26178;&#38291;</th>
             </tr>
           </thead>
@@ -310,9 +507,9 @@ $($rows -join "`n")
       --bar-progress: #f5a623;
       --bar-assigned: #5ea3f5;
       --bar-review: #b07ef5;
-      --bar-done: #8f99ac;
-      --bar-testing: #3dbf68;
-      --bar-other: #22d3ee;
+      --bar-done: #3dbf68;
+      --bar-testing: #ef4444;
+      --bar-other: #8f99ac;
     }
     * { box-sizing: border-box; }
     body {
@@ -407,7 +604,16 @@ $($rows -join "`n")
     }
     .metric-card:hover {
       transform: translateY(-1px);
-      border-color: rgba(255,255,255,0.42);
+      background: #343530;
+      border-color: rgba(255,255,255,0.48);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.22);
+    }
+    .metric-card:hover .metric-label {
+      color: var(--text);
+    }
+    .metric-card:active {
+      transform: translateY(0);
+      box-shadow: none;
     }
     .metric-card:focus-visible {
       outline: 2px solid rgba(255,255,255,0.6);
@@ -473,6 +679,16 @@ $($rows -join "`n")
     .section-header.collapsed {
       border-bottom: 0;
     }
+    .section-header:hover {
+      background: #343530;
+    }
+    .section-header:hover .chevron {
+      border-color: var(--text);
+    }
+    .section-header:focus-visible {
+      outline: 2px solid rgba(255,255,255,0.55);
+      outline-offset: -2px;
+    }
     .section-left {
       display: inline-flex;
       align-items: center;
@@ -522,10 +738,10 @@ $($rows -join "`n")
     .status-progress { background:#fff0d7; color:#8a4c00; border-color:#ffd59b; }
     .status-assigned { background:#dbe9ff; color:#25559c; border-color:#bcd2ff; }
     .status-review { background:#ead7ff; color:#5f33a6; border-color:#d5b7ff; }
-    .status-done { background:#e9edf3; color:#53606f; border-color:#d7dde7; }
-    .status-testing { background:#d9f4e3; color:#1c6b37; border-color:#bce7ca; }
+    .status-done { background:#d9f4e3; color:#1c6b37; border-color:#bce7ca; }
+    .status-testing { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
     .status-wait { background:#fff1f3; color:#b42318; border-color:#ffc9cf; }
-    .status-other { background:#e6f9fb; color:#195a63; border-color:#9de6ee; }
+    .status-other { background:#e9edf3; color:#53606f; border-color:#d7dde7; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -548,6 +764,11 @@ $($rows -join "`n")
     }
     tr:last-child td { border-bottom: 0; }
     tbody tr:hover td { background: var(--surface-2); }
+    .empty-row {
+      color: var(--hint);
+      text-align: center;
+      padding: 18px 20px;
+    }
     a {
       color: var(--link);
       text-decoration: none;
@@ -565,19 +786,80 @@ $($rows -join "`n")
       min-width: 360px;
       font-size: 13px;
     }
+    .issue-title-button {
+      width: 100%;
+      padding: 0;
+      color: var(--text);
+      background: transparent;
+      border: 0;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .issue-title-button:hover {
+      color: var(--link);
+      text-decoration: underline;
+    }
+    .issue-title-button:focus-visible {
+      outline: 2px solid rgba(158,197,255,0.7);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .hidden-detail {
+      display: none;
+    }
+    .issue-detail-row td {
+      padding: 16px 20px 16px 110px;
+      background: rgba(255,255,255,0.025);
+    }
+    .issue-detail-panel {
+      display: grid;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+    .detail-section {
+      display: grid;
+      gap: 5px;
+    }
+    .detail-section h4 {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .detail-text {
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: normal;
+    }
+    .detail-empty {
+      color: var(--hint);
+      font-size: 13px;
+    }
     .col-date {
       white-space: nowrap;
       width: 130px;
       color: var(--hint);
       font-size: 13px;
-      text-align: right;
+      text-align: left;
+    }
+    .col-target {
+      white-space: nowrap;
+      width: 110px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: left;
     }
     @media (max-width: 900px) {
       main { width: calc(100% - 24px); margin-top: 20px; }
       .topbar { display: block; }
       .topbar-right { align-items: flex-start; margin-top: 10px; }
       .meta { text-align: left; }
-      table { min-width: 680px; }
+      table { min-width: 790px; }
     }
     @media (max-width: 560px) {
       h1 { font-size: 20px; }
@@ -610,9 +892,12 @@ $($sections -join "`n")
   </main>
   <script>
     function toggleSection(header) {
+      var section = header.closest('.section');
       var body = header.nextElementSibling;
       var icon = header.querySelector('.chevron');
+      if (!section) return;
       if (body.classList.contains('collapsed-body')) {
+        collapseIssueDetails(section);
         body.classList.remove('collapsed-body');
         header.classList.remove('collapsed');
         icon.classList.add('open');
@@ -620,6 +905,7 @@ $($sections -join "`n")
         body.classList.add('collapsed-body');
         header.classList.add('collapsed');
         icon.classList.remove('open');
+        collapseIssueDetails(section);
       }
     }
     function openStatusSection(statusKey) {
@@ -635,12 +921,23 @@ $($sections -join "`n")
         body.classList.add('collapsed-body');
         header.classList.add('collapsed');
         icon.classList.remove('open');
+        collapseIssueDetails(section);
       } else {
         body.classList.remove('collapsed-body');
         header.classList.remove('collapsed');
         icon.classList.add('open');
         section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+    }
+    function toggleIssueDetail(detailId) {
+      var row = document.getElementById(detailId);
+      if (!row) return;
+      row.classList.toggle('hidden-detail');
+    }
+    function collapseIssueDetails(section) {
+      section.querySelectorAll('.issue-detail-row').forEach(function(row) {
+        row.classList.add('hidden-detail');
+      });
     }
   </script>
 </body>
@@ -651,7 +948,7 @@ $($sections -join "`n")
     return $reportFile
 }
 
-function Invoke-MantisRequest {
+function New-MantisWebSession {
     param(
         [string]$Url,
         [pscredential]$Credential
@@ -675,6 +972,16 @@ function Invoke-MantisRequest {
             return = $Url
         } | Out-Null
 
+    return $session
+}
+
+function Invoke-MantisRequest {
+    param(
+        [string]$Url,
+        [pscredential]$Credential
+    )
+
+    $session = New-MantisWebSession -Url $Url -Credential $Credential
     return Invoke-WebRequest -Uri $Url -WebSession $session -UseBasicParsing
 }
 
@@ -695,12 +1002,17 @@ if (-not (Test-Path -LiteralPath $credentialPath)) {
 }
 
 $credential = Import-Clixml -LiteralPath $credentialPath
-$response = Invoke-MantisRequest -Url $config.MantisUrl -Credential $credential
+$session = New-MantisWebSession -Url $config.MantisUrl -Credential $credential
+$response = Invoke-WebRequest -Uri $config.MantisUrl -WebSession $session -UseBasicParsing
 $items = @(Get-MantisItemsFromHtml -Html $response.Content -BaseUrl $config.MantisUrl)
 
 if ($items.Count -eq 0) {
     Write-Log -Path $logPath -Message "No Mantis items found. Login may have failed or page markup may be different."
     throw "No Mantis items found. Check credentials, filter URL, or page markup."
+}
+
+if ($ListItems -or $HtmlReport) {
+    $items = @(Add-MantisDetailFields -Items $items -Session $session)
 }
 
 if ($ListItems) {
@@ -710,6 +1022,7 @@ if ($ListItems) {
             Id = $item.Id
             Title = $item.Title
             LastModified = $item.LastModified
+            TargetVersion = $item.TargetVersion
             StatusKey = $statusInfo.Key
             StatusOrder = $statusInfo.Order
             StatusLabelText = $statusInfo.LabelText
@@ -723,6 +1036,7 @@ if ($ListItems) {
     $idHeader = New-Text @(0x9805, 0x76EE, 0x7DE8, 0x865F)
     $titleHeader = New-Text @(0x9805, 0x76EE, 0x540D, 0x7A31)
     $updatedHeader = New-Text @(0x66F4, 0x65B0, 0x6642, 0x9593)
+    $targetVersionHeader = New-Text @(0x76EE, 0x6A19, 0x7248, 0x672C)
     $countUnit = New-Text @(0x7B46)
 
     foreach ($group in $statusGroups) {
@@ -735,7 +1049,8 @@ if ($ListItems) {
             Format-Table `
                 @{Label=$idHeader; Expression={$_.Id}},
                 @{Label=$titleHeader; Expression={$_.Title}},
-                @{Label=$updatedHeader; Expression={$_.LastModified}} `
+                @{Label=$updatedHeader; Expression={$_.LastModified}},
+                @{Label=$targetVersionHeader; Expression={$_.TargetVersion}} `
                 -AutoSize
     }
 
