@@ -1,10 +1,10 @@
-# Mantis 項目提醒工具
+# Mantis Report Watcher
 
-這個工具會抓取指定的 Mantis 待辦清單，記錄已看過的項目。之後只要清單出現新的項目編號，就會跳 Windows 通知。
+This tool reads a configured Mantis worklist, records the issue IDs that have already been seen, and shows a Windows notification when a new issue appears.
 
-也可以產生 HTML 報表，方便查看目前待辦。
+It can also generate an HTML report for quickly reviewing the current worklist.
 
-## 第一次使用
+## First-Time Setup
 
 ```powershell
 cd C:\Users\A25228\Documents\Mantis
@@ -13,63 +13,68 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Set-MantisCredential.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1 -InitializeOnly
 ```
 
-`Set-MantisCredential.ps1` 會要求輸入 Mantis 帳號密碼。  
-`-InitializeOnly` 會把目前既有項目記成已看過，避免第一次全部跳通知。
+`Set-MantisCredential.ps1` will ask for your Mantis username and password.  
+`-InitializeOnly` marks the current issues as already seen, so existing issues will not trigger notifications.
 
-## 日常使用
+## Daily Use
 
-檢查是否有新項目：
+Check for new issues:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1
 ```
 
-產生 HTML 報表：
+Generate the HTML report:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1 -HtmlReport
 ```
 
-報表位置：
+Report path:
 
 ```text
 C:\Users\A25228\Documents\Mantis\reports\mantis-items.html
 ```
 
-測試通知：
+Test Windows notification:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1 -TestNotification
 ```
 
-建立每 10 分鐘自動檢查：
+Register a scheduled check every 10 minutes:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Register-MantisWatcherTask.ps1 -Minutes 10
 ```
 
-## 常用檔案
+## Shortcut Files
 
-- `config.json`: Mantis 網址與工具設定。
-- `data\mantis-seen-items.json`: 已看過的項目編號。
-- `reports\mantis-items.html`: HTML 報表。
-- `logs\mantis-watcher.log`: 執行紀錄。
-- `secrets\mantis-credential.xml`: 本機加密後的帳密。
+- `MantisReport.cmd`: update the HTML report and open it.
+- `MantisReportTask.cmd`: update the HTML report in the background; suitable for Windows Task Scheduler.
 
-## 重新設定
+## Common Files
 
-如果換了 Mantis 篩選條件，請重新初始化：
+- `config.json`: local Mantis URL and tool settings.
+- `data\mantis-seen-items.json`: issue IDs that have already been seen.
+- `reports\mantis-items.html`: generated HTML report.
+- `logs\mantis-watcher.log`: execution log.
+- `secrets\mantis-credential.xml`: locally encrypted Mantis credential.
+
+## Reset
+
+If the Mantis filter URL changes, reset the seen issue baseline:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Check-MantisNewItems.ps1 -InitializeOnly
 ```
 
-如果帳密錯誤，重新輸入帳密：
+If the credential is wrong, re-enter it:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Set-MantisCredential.ps1
 ```
 
-## 注意
+## Note
 
-`secrets\mantis-credential.xml` 只能由目前 Windows 使用者在這台電腦解密，不要分享給其他人。
+`secrets\mantis-credential.xml` is encrypted for the current Windows user on the current machine. Do not share it.
