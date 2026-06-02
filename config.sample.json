@@ -1,0 +1,7 @@
+{
+  "MantisUrl": "http://your-mantis-server/mantisbt/search.php?project_id=0&handler_id=YOUR_USER_ID&sticky=on&sort=last_updated&dir=DESC&hide_status=80&match_type=0",
+  "CredentialPath": ".\\secrets\\mantis-credential.xml",
+  "StatePath": ".\\data\\mantis-seen-items.json",
+  "LogPath": ".\\logs\\mantis-watcher.log",
+  "Notify": true
+}

@@ -1,0 +1,10 @@
+config.json
+secrets/
+data/
+logs/
+reports/
+
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
