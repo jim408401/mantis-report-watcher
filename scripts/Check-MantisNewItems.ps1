@@ -385,6 +385,7 @@ function New-MantisHtmlReport {
             StatusLabelHtml = $statusInfo.LabelHtml
             StatusClass = $statusInfo.Class
             StatusOpen = $statusInfo.Open
+            IsNew = [bool]$item.IsNew
         }
     }
 
@@ -413,16 +414,22 @@ function New-MantisHtmlReport {
             Open = $definition.Open
             Items = $groupItems
             ItemCount = @($groupItems).Count
+            NewCount = @($groupItems | Where-Object { $_.IsNew }).Count
         }
     }
 
     $summaryCards = foreach ($group in $groups) {
+        $newBadge = if ($group.NewCount -gt 0) {
+            "<span class=""new-count-badge"" aria-label=""New items"">&#8593;$($group.NewCount)</span>"
+        } else {
+            ""
+        }
 @"
       <button class="metric-card metric-$($group.Key)" type="button" onclick="openStatusSection('$($group.Key)')">
         <div class="metric-bar"></div>
         <div class="metric-inner">
           <div class="metric-num">$($group.ItemCount)</div>
-          <div class="metric-label">$($group.LabelHtml)</div>
+          <div class="metric-label">$($group.LabelHtml)$newBadge</div>
         </div>
       </button>
 "@
@@ -432,6 +439,11 @@ function New-MantisHtmlReport {
         $headerClass = if ($group.Open) { "section-header" } else { "section-header collapsed" }
         $bodyClass = if ($group.Open) { "section-body" } else { "section-body collapsed-body" }
         $iconClass = if ($group.Open) { "chevron open" } else { "chevron" }
+        $sectionNewBadge = if ($group.NewCount -gt 0) {
+            "<span class=""new-count-badge section-new-badge"" aria-label=""New items"">&#8593;$($group.NewCount)</span>"
+        } else {
+            ""
+        }
         $rows = foreach ($viewItem in (@($group.Items) | Sort-Object @{Expression={$_.Item.LastModified}; Descending=$true}, @{Expression={[int]$_.Item.Id}; Descending=$true})) {
             $item = $viewItem.Item
             $id = [System.Net.WebUtility]::HtmlEncode($item.Id)
@@ -446,10 +458,11 @@ function New-MantisHtmlReport {
             } else {
                 $item.DetailHtml
             }
+            $rowClass = if ($viewItem.IsNew) { "issue-row new-issue" } else { "issue-row" }
 @"
-          <tr class="issue-row" data-id="$id" data-updated="$lastModified" data-target-version="$targetVersionNumber">
+          <tr class="$rowClass" data-id="$id" data-updated="$lastModified" data-target-version="$targetVersionNumber">
             <td class="col-id"><a href="$url" target="_blank">#$id</a></td>
-            <td class="col-title"><button class="issue-title-button" type="button" onclick="toggleIssueDetail('$detailId')">$title</button></td>
+            <td class="col-title"><button class="issue-title-button" type="button" onclick="toggleIssueDetail('$detailId')"><span class="expand-box" aria-hidden="true">+</span><span class="issue-title-text">$title</span></button></td>
             <td class="col-target">$targetVersion</td>
             <td class="col-date">$lastModified</td>
           </tr>
@@ -477,6 +490,7 @@ $detailHtml
         <span class="section-left">
           <span class="$iconClass"></span>
           <span class="pill $($group.Class)">$($group.LabelHtml)</span>
+          $sectionNewBadge
         </span>
         <span class="section-count"><strong>$($group.ItemCount)</strong> &#31558;</span>
       </button>
@@ -740,9 +754,32 @@ $($rows -join "`n")
       letter-spacing: 0;
     }
     .metric-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       color: var(--muted);
       font-size: 12px;
       font-weight: 600;
+    }
+    .new-count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      color: #fff7ed;
+      background: rgba(245,166,35,0.22);
+      border: 1px solid rgba(245,166,35,0.58);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.18);
+    }
+    .section-new-badge {
+      height: 22px;
+      min-width: 28px;
     }
     .metric-progress .metric-bar { background: var(--bar-progress); }
     .metric-assigned .metric-bar { background: var(--bar-assigned); }
@@ -889,6 +926,9 @@ $($rows -join "`n")
       font-size: 13px;
     }
     .issue-title-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
       width: 100%;
       padding: 0;
       color: var(--text);
@@ -901,6 +941,38 @@ $($rows -join "`n")
     .issue-title-button:hover {
       color: var(--link);
       text-decoration: underline;
+    }
+    .expand-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      border-radius: 4px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.22);
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+    .issue-title-button:hover .expand-box {
+      color: var(--text);
+      background: rgba(158,197,255,0.16);
+      border-color: rgba(158,197,255,0.62);
+    }
+    .issue-title-button.expanded .expand-box {
+      color: #fff7ed;
+      background: rgba(245,166,35,0.22);
+      border-color: rgba(245,166,35,0.64);
+    }
+    .issue-title-text {
+      min-width: 0;
+    }
+    .new-issue td {
+      background: rgba(245,166,35,0.055);
     }
     .issue-title-button:focus-visible {
       outline: 2px solid rgba(158,197,255,0.7);
@@ -1069,11 +1141,25 @@ $($sections -join "`n")
     function toggleIssueDetail(detailId) {
       var row = document.getElementById(detailId);
       if (!row) return;
-      row.classList.toggle('hidden-detail');
+      var isHidden = row.classList.toggle('hidden-detail');
+      var button = document.querySelector('button[onclick="toggleIssueDetail(\'' + detailId + '\')"]');
+      if (!button) return;
+      var box = button.querySelector('.expand-box');
+      button.classList.toggle('expanded', !isHidden);
+      if (box) {
+        box.textContent = isHidden ? '+' : '-';
+      }
     }
     function collapseIssueDetails(section) {
       section.querySelectorAll('.issue-detail-row').forEach(function(row) {
         row.classList.add('hidden-detail');
+      });
+      section.querySelectorAll('.issue-title-button.expanded').forEach(function(button) {
+        button.classList.remove('expanded');
+        var box = button.querySelector('.expand-box');
+        if (box) {
+          box.textContent = '+';
+        }
       });
     }
     function sortIssueRows(mode) {
@@ -1231,7 +1317,31 @@ if ($ListItems) {
 }
 
 if ($HtmlReport) {
+    $reportStatePath = Join-Path -Path (Split-Path -Parent $statePath) -ChildPath "mantis-report-seen-items.json"
+    $reportSeenIds = @{}
+    if (Test-Path -LiteralPath $reportStatePath) {
+        $reportSaved = Get-Content -LiteralPath $reportStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($id in @($reportSaved.SeenIds)) {
+            $reportSeenIds[[string]$id] = $true
+        }
+    }
+
+    foreach ($item in $items) {
+        $isNew = -not $reportSeenIds.ContainsKey([string]$item.Id)
+        $item | Add-Member -NotePropertyName IsNew -NotePropertyValue $isNew -Force
+    }
+
     $reportFile = New-MantisHtmlReport -Items $items -Path $ReportPath
+    $reportStateDir = Split-Path -Parent $reportStatePath
+    if (-not (Test-Path -LiteralPath $reportStateDir)) {
+        New-Item -ItemType Directory -Path $reportStateDir | Out-Null
+    }
+
+    $reportState = [pscustomobject]@{
+        CheckedAt = (Get-Date).ToString("o")
+        SeenIds = @($items.Id | Sort-Object -Unique)
+    }
+    $reportState | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $reportStatePath -Encoding UTF8
     Write-Host "HTML report created: $reportFile"
     return
 }
