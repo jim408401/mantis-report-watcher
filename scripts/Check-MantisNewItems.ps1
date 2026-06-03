@@ -92,7 +92,7 @@ function Get-StatusInfo {
     $otherText = New-Text @(0x5176, 0x4ED6)
 
     if ($status -match "feedback" -or $name.Contains($progressText)) {
-        return [pscustomobject]@{ Key = "progress"; Order = 1; LabelText = $progressText; LabelHtml = "&#36914;&#34892;&#20013;"; Class = "status-progress"; Open = $false }
+        return [pscustomobject]@{ Key = "progress"; Order = 1; LabelText = $progressText; LabelHtml = "&#36914;&#34892;&#20013;"; Class = "status-progress"; Open = $true }
     }
     if ($status -match "assigned" -or $name.Contains($assignedText)) {
         return [pscustomobject]@{ Key = "assigned"; Order = 2; LabelText = $assignedText; LabelHtml = "&#24050;&#20998;&#37197;"; Class = "status-assigned"; Open = $false }
@@ -119,7 +119,7 @@ function Get-StatusDefinitions {
     $otherText = New-Text @(0x5176, 0x4ED6)
 
     return @(
-        [pscustomobject]@{ Key = "progress"; Order = 1; LabelText = $progressText; LabelHtml = "&#36914;&#34892;&#20013;"; Class = "status-progress"; Open = $false },
+        [pscustomobject]@{ Key = "progress"; Order = 1; LabelText = $progressText; LabelHtml = "&#36914;&#34892;&#20013;"; Class = "status-progress"; Open = $true },
         [pscustomobject]@{ Key = "assigned"; Order = 2; LabelText = $assignedText; LabelHtml = "&#24050;&#20998;&#37197;"; Class = "status-assigned"; Open = $false },
         [pscustomobject]@{ Key = "review"; Order = 3; LabelText = $reviewText; LabelHtml = "&#24453; CR"; Class = "status-review"; Open = $false },
         [pscustomobject]@{ Key = "done"; Order = 4; LabelText = $doneText; LabelHtml = "&#24050;&#23436;&#25104;"; Class = "status-done"; Open = $false },
@@ -222,6 +222,21 @@ function Convert-PlainTextToHtml {
 
     $encoded = [System.Net.WebUtility]::HtmlEncode($Text.Trim())
     return ($encoded -replace "(`r`n|`n|`r)", "<br>")
+}
+
+function Get-VersionNumber {
+    param([string]$Version)
+
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        return -1
+    }
+
+    $match = [regex]::Match($Version, '\d+(?:\.\d+)?')
+    if (-not $match.Success) {
+        return -1
+    }
+
+    return [double]::Parse($match.Value, [System.Globalization.CultureInfo]::InvariantCulture)
 }
 
 function Convert-DetailBlockText {
@@ -417,11 +432,12 @@ function New-MantisHtmlReport {
         $headerClass = if ($group.Open) { "section-header" } else { "section-header collapsed" }
         $bodyClass = if ($group.Open) { "section-body" } else { "section-body collapsed-body" }
         $iconClass = if ($group.Open) { "chevron open" } else { "chevron" }
-        $rows = foreach ($viewItem in (@($group.Items) | Sort-Object {[int]$_.Item.Id})) {
+        $rows = foreach ($viewItem in (@($group.Items) | Sort-Object @{Expression={$_.Item.LastModified}; Descending=$true}, @{Expression={[int]$_.Item.Id}; Descending=$true})) {
             $item = $viewItem.Item
             $id = [System.Net.WebUtility]::HtmlEncode($item.Id)
             $lastModified = [System.Net.WebUtility]::HtmlEncode($item.LastModified)
             $targetVersion = [System.Net.WebUtility]::HtmlEncode($item.TargetVersion)
+            $targetVersionNumber = Get-VersionNumber $item.TargetVersion
             $title = [System.Net.WebUtility]::HtmlEncode($item.Title)
             $url = [System.Net.WebUtility]::HtmlEncode($item.Url)
             $detailId = "detail-$id"
@@ -431,7 +447,7 @@ function New-MantisHtmlReport {
                 $item.DetailHtml
             }
 @"
-          <tr>
+          <tr class="issue-row" data-id="$id" data-updated="$lastModified" data-target-version="$targetVersionNumber">
             <td class="col-id"><a href="$url" target="_blank">#$id</a></td>
             <td class="col-title"><button class="issue-title-button" type="button" onclick="toggleIssueDetail('$detailId')">$title</button></td>
             <td class="col-target">$targetVersion</td>
@@ -525,58 +541,144 @@ $($rows -join "`n")
       margin: 50px auto 56px;
     }
     .topbar {
+      position: relative;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      min-height: 98px;
-      padding: 24px 28px;
+      gap: 24px;
+      padding: 20px 24px 20px 22px;
       margin-bottom: 18px;
       background: var(--surface);
-      border: 1px solid var(--line-2);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .topbar-accent {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      border-radius: 12px 0 0 12px;
+      background: linear-gradient(180deg, var(--bar-progress) 0%, var(--bar-assigned) 50%, var(--bar-review) 100%);
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+    .topbar-icon {
+      width: 42px;
+      height: 42px;
       border-radius: 10px;
+      background: rgba(245,166,35,0.12);
+      border: 1px solid rgba(245,166,35,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .topbar-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: #f5a623;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .topbar-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
     }
     h1 {
       margin: 0;
-      font-size: 22px;
-      font-weight: 700;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text);
       letter-spacing: 0;
+      line-height: 1.2;
     }
-    .meta {
-      color: var(--muted);
-      font-size: 12px;
-      text-align: right;
-    }
-    .meta-line {
+    .topbar-sub {
       display: flex;
       align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 6px;
+      gap: 5px;
+      font-size: 12px;
       color: var(--hint);
-      font-size: 13px;
     }
+    .topbar-sub .sep { opacity: 0.5; }
     .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      z-index: 1;
+    }
+    .topbar-divider {
+      width: 1px;
+      height: 32px;
+      background: var(--line);
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .stat-num {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--hint);
+      white-space: nowrap;
+    }
+    .dot-stack {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .topbar-controls {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
       gap: 5px;
     }
-    .badge-total {
+    .sort-control {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--surface-2);
-      border: 1px solid var(--line-2);
-      color: var(--muted);
-      font-size: 13px;
+      gap: 7px;
+      color: var(--hint);
+      font-size: 12px;
       white-space: nowrap;
     }
-    .badge-total strong {
+    .sort-control select {
+      padding: 4px 10px;
       color: var(--text);
-      font-weight: 500;
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 6px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .sort-control select:focus-visible {
+      outline: 2px solid rgba(255,255,255,0.55);
+      outline-offset: 2px;
+    }
+    .meta {
+      color: var(--hint);
+      font-size: 11px;
+      text-align: right;
     }
     .metric-grid {
       display: flex;
@@ -700,13 +802,13 @@ $($rows -join "`n")
       height: 8px;
       border-right: 2px solid var(--hint);
       border-bottom: 2px solid var(--hint);
-      transform: rotate(45deg);
+      transform: rotate(-45deg);
       transition: transform 160ms ease;
-      margin-top: -3px;
+      margin-top: 0;
     }
     .chevron.open {
-      transform: rotate(-135deg);
-      margin-top: 3px;
+      transform: rotate(45deg);
+      margin-top: -3px;
     }
     .section-count {
       color: var(--hint);
@@ -856,31 +958,66 @@ $($rows -join "`n")
     }
     @media (max-width: 900px) {
       main { width: calc(100% - 24px); margin-top: 20px; }
-      .topbar { display: block; }
-      .topbar-right { align-items: flex-start; margin-top: 10px; }
+      .topbar { flex-wrap: wrap; }
+      .topbar-right { flex-wrap: wrap; gap: 12px; }
       .meta { text-align: left; }
       table { min-width: 790px; }
     }
     @media (max-width: 560px) {
-      h1 { font-size: 20px; }
       .topbar { padding: 16px; }
+      h1 { font-size: 15px; }
     }
   </style>
 </head>
 <body>
   <main>
     <div class="topbar">
-      <div>
-        <h1>Mantis &#22577;&#21578;&#25972;&#29702;</h1>
-        <div class="meta-line">
-          <span>Issue tracker</span>
-          <span>&gt;</span>
-          <span>&#25105;&#30340;&#24453;&#36774;&#28165;&#21934;</span>
+      <div class="topbar-accent"></div>
+
+      <div class="topbar-left">
+        <div class="topbar-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <path d="M9 12h6M9 16h4"/>
+          </svg>
+        </div>
+        <div class="topbar-title-group">
+          <h1>Mantis &#22577;&#21578;&#25972;&#29702;</h1>
+          <div class="topbar-sub">
+            <span>Issue tracker</span>
+            <span class="sep">&#8250;</span>
+            <span>&#25105;&#30340;&#24453;&#36774;&#28165;&#21934;</span>
+          </div>
         </div>
       </div>
+
       <div class="topbar-right">
-        <div class="badge-total">&#32317;&#35336; <strong>$($Items.Count)</strong> &#31558;</div>
-        <div class="meta">&#29986;&#29983;&#26178;&#38291;: $generatedAt</div>
+        <div class="stat-item">
+          <span class="stat-num">$($Items.Count)</span>
+          <span class="stat-label">&#32317;&#35336;&#31558;&#25976;</span>
+        </div>
+        <div class="topbar-divider"></div>
+        <div class="dot-stack" aria-hidden="true">
+          <div class="dot" style="background:var(--bar-progress);"></div>
+          <div class="dot" style="background:var(--bar-assigned);"></div>
+          <div class="dot" style="background:var(--bar-review);"></div>
+          <div class="dot" style="background:var(--bar-done);"></div>
+          <div class="dot" style="background:var(--bar-testing);"></div>
+          <div class="dot" style="background:var(--bar-other);"></div>
+        </div>
+        <div class="topbar-divider"></div>
+        <div class="topbar-controls">
+          <label class="sort-control">
+            <span>&#25490;&#24207;</span>
+            <select id="sortMode" onchange="sortIssueRows(this.value)">
+              <option value="updated" selected>&#26356;&#26032;&#26178;&#38291;</option>
+              <option value="id">&#38917;&#30446;&#32232;&#34399;</option>
+              <option value="target">&#30446;&#27161;&#29256;&#26412;</option>
+            </select>
+          </label>
+          <div class="meta">&#29986;&#29983;&#26178;&#38291;: $generatedAt</div>
+        </div>
       </div>
     </div>
     <div class="metric-grid">
@@ -939,6 +1076,41 @@ $($sections -join "`n")
         row.classList.add('hidden-detail');
       });
     }
+    function sortIssueRows(mode) {
+      document.querySelectorAll('.section-body tbody').forEach(function(tbody) {
+        var pairs = [];
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+
+        rows.forEach(function(row) {
+          if (!row.classList.contains('issue-row')) return;
+          pairs.push({
+            issue: row,
+            detail: row.nextElementSibling && row.nextElementSibling.classList.contains('issue-detail-row') ? row.nextElementSibling : null
+          });
+        });
+
+        pairs.sort(function(a, b) {
+          if (mode === 'id') {
+            return Number(b.issue.dataset.id || 0) - Number(a.issue.dataset.id || 0);
+          }
+          if (mode === 'target') {
+            var targetDiff = Number(b.issue.dataset.targetVersion || -1) - Number(a.issue.dataset.targetVersion || -1);
+            if (targetDiff !== 0) return targetDiff;
+            return Number(b.issue.dataset.id || 0) - Number(a.issue.dataset.id || 0);
+          }
+
+          var updatedDiff = String(b.issue.dataset.updated || '').localeCompare(String(a.issue.dataset.updated || ''));
+          if (updatedDiff !== 0) return updatedDiff;
+          return Number(b.issue.dataset.id || 0) - Number(a.issue.dataset.id || 0);
+        });
+
+        pairs.forEach(function(pair) {
+          tbody.appendChild(pair.issue);
+          if (pair.detail) tbody.appendChild(pair.detail);
+        });
+      });
+    }
+    sortIssueRows('updated');
   </script>
 </body>
 </html>
