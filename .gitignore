@@ -1,8 +1,5 @@
-config.json
-secrets/
-data/
-logs/
-reports/
+# build output (publish the exe via GitHub Releases instead of committing it)
+dist/
 
 *.log
 *.tmp

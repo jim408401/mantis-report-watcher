@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mantis 小幫手</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #1f1f1d;
+  --surface: #2c2d2a;
+  --surface-2: #252623;
+  --surface-3: #343530;
+  --text: #f0f0ea;
+  --muted: #c7c7bd;
+  --hint: #9c9d95;
+  --line: rgba(255,255,255,0.11);
+  --line-2: rgba(255,255,255,0.22);
+  --link: #9ec5ff;
+  --accent: #f5a623;
+  --accent-soft: rgba(245,166,35,0.16);
+  --accent-line: rgba(245,166,35,0.55);
+  --danger: #f87171;
+  --danger-soft: rgba(248,113,113,0.12);
+  --ok: #3dbf68;
+  --focus: rgba(158,197,255,0.75);
+  --shadow: 0 10px 30px rgba(0,0,0,0.35);
+  --bar-progress: #f5a623;
+  --bar-assigned: #5ea3f5;
+  --bar-review: #b07ef5;
+  --bar-done: #3dbf68;
+  --bar-testing: #ef4444;
+  --bar-other: #8f99ac;
+  --input-bg: #232421;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f1;
+  --surface: #ffffff;
+  --surface-2: #f7f7f4;
+  --surface-3: #efefea;
+  --text: #1d1d1b;
+  --muted: #4a4a45;
+  --hint: #7a7a72;
+  --line: rgba(0,0,0,0.09);
+  --line-2: rgba(0,0,0,0.18);
+  --link: #1f5fbf;
+  --accent: #d48806;
+  --accent-soft: rgba(245,166,35,0.14);
+  --accent-line: rgba(212,136,6,0.55);
+  --danger: #c62828;
+  --danger-soft: rgba(198,40,40,0.08);
+  --focus: rgba(31,95,191,0.6);
+  --shadow: 0 10px 30px rgba(0,0,0,0.10);
+  --input-bg: #ffffff;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f4f4f1; --surface: #ffffff; --surface-2: #f7f7f4; --surface-3: #efefea;
+    --text: #1d1d1b; --muted: #4a4a45; --hint: #7a7a72;
+    --line: rgba(0,0,0,0.09); --line-2: rgba(0,0,0,0.18); --link: #1f5fbf;
+    --accent: #d48806; --accent-soft: rgba(245,166,35,0.14); --accent-line: rgba(212,136,6,0.55);
+    --danger: #c62828; --danger-soft: rgba(198,40,40,0.08); --focus: rgba(31,95,191,0.6);
+    --shadow: 0 10px 30px rgba(0,0,0,0.10); --input-bg: #ffffff;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hidden { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------- shared controls ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 34px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--line-2); background: var(--surface); cursor: pointer;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.btn:hover { background: var(--surface-3); border-color: var(--line-2); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.55; cursor: default; transform: none; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #1b1300; }
+.btn-primary:hover { background: #ffb53d; border-color: #ffb53d; }
+.btn-ghost { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--surface-3); }
+.btn-danger { color: var(--danger); }
+.icon-btn {
+  width: 34px; height: 34px; padding: 0; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent; cursor: pointer; color: var(--muted);
+}
+.icon-btn:hover { background: var(--surface-3); color: var(--text); }
+.icon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.field .hint { font-size: 12px; color: var(--hint); }
+.input {
+  width: 100%; height: 40px; padding: 0 12px; border-radius: 8px;
+  background: var(--input-bg); border: 1px solid var(--line-2); outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.input-wrap { position: relative; }
+.input-wrap .input { padding-right: 42px; }
+.input-wrap .icon-btn { position: absolute; right: 3px; top: 3px; }
+select.input { padding-right: 30px; cursor: pointer; }
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 13px; color: var(--muted); }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.switch { position: relative; width: 38px; height: 22px; flex: 0 0 auto; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line-2); transition: background 140ms ease; }
+.switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 140ms ease; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 11px 13px; border-radius: 9px; font-size: 13px;
+  background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); color: var(--text);
+}
+.alert .icon { color: var(--danger); margin-top: 1px; }
+.alert b { display: block; margin-bottom: 2px; }
+.alert small { color: var(--hint); display: block; margin-top: 4px; word-break: break-all; }
+
+/* ---------- login ---------- */
+#login { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 32px 16px; }
+.login-card {
+  width: min(420px, 100%);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow); padding: 30px 30px 24px; position: relative; overflow: hidden;
+}
+.login-card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--bar-progress), var(--bar-assigned) 50%, var(--bar-review));
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.brand-mark { width: 44px; height: 44px; flex: 0 0 auto; }
+.brand h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: 0.2px; }
+.brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--hint); }
+.login-form { display: grid; gap: 15px; }
+.login-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+details.adv { border-top: 1px solid var(--line); padding-top: 12px; }
+details.adv summary { cursor: pointer; font-size: 12.5px; color: var(--hint); list-style: none; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+details.adv summary::-webkit-details-marker { display: none; }
+details.adv summary .icon { width: 14px; height: 14px; transition: transform 140ms ease; }
+details.adv[open] summary .icon { transform: rotate(90deg); }
+.adv-body { display: grid; gap: 13px; margin-top: 13px; }
+.login-submit { height: 42px; font-size: 14px; width: 100%; margin-top: 4px; }
+.login-foot { margin-top: 18px; text-align: center; font-size: 11.5px; color: var(--hint); }
+
+/* ---------- main ---------- */
+#main { min-height: 100%; }
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-inner, .content { width: min(980px, calc(100% - 40px)); margin: 0 auto; }
+.topbar-inner { display: flex; align-items: center; gap: 14px; height: 62px; }
+.topbar .brand { margin: 0; gap: 10px; min-width: 0; }
+.topbar .brand-mark { width: 34px; height: 34px; }
+.topbar .brand h1 { font-size: 15.5px; }
+.topbar .brand p { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spacer { flex: 1; }
+.sync-status { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; color: var(--hint); line-height: 1.35; white-space: nowrap; }
+.sync-status strong { color: var(--muted); font-weight: 600; }
+.content { padding: 18px 0 48px; }
+.banner { margin-bottom: 14px; }
+.banner .alert { align-items: center; }
+.banner .alert .grow { flex: 1; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.search { position: relative; flex: 1 1 260px; min-width: 200px; }
+.search .icon { position: absolute; left: 11px; top: 11px; width: 16px; height: 16px; color: var(--hint); pointer-events: none; }
+.search .input { height: 38px; padding-left: 34px; padding-right: 60px; }
+.search kbd { position: absolute; right: 9px; top: 9px; font-family: inherit; font-size: 11px; color: var(--hint); border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 6px; background: var(--surface-2); }
+.seg { display: inline-flex; padding: 3px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 9px; }
+.seg button { height: 30px; padding: 0 12px; border: 0; background: transparent; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--hint); display: inline-flex; align-items: center; gap: 6px; }
+.seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.seg .count { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.sort { height: 38px; width: auto; }
+
+.metric-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.metric-card {
+  position: relative; display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  min-height: 78px; padding: 14px 14px 12px; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: 9px; overflow: hidden;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+.metric-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--c); }
+.metric-card:hover { transform: translateY(-1px); background: var(--surface-3); box-shadow: 0 8px 18px rgba(0,0,0,0.18); }
+.metric-card[aria-pressed="true"] { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+.metric-card.empty { opacity: 0.55; }
+.metric-num { font-size: 27px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; }
+.metric-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.badge {
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  min-width: 22px; height: 19px; padding: 0 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; line-height: 1;
+  color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line);
+}
+.badge-new { color: #fff7ed; background: #e8590c; border-color: #e8590c; letter-spacing: 0.4px; }
+.badge-upd { color: var(--link); background: color-mix(in srgb, var(--link) 14%, transparent); border-color: color-mix(in srgb, var(--link) 45%, transparent); }
+
+.sections { display: flex; flex-direction: column; gap: 10px; }
+.section { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.section-header {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  min-height: 48px; padding: 10px 18px; border: 0; background: transparent; cursor: pointer; text-align: left;
+}
+.section-header:hover { background: var(--surface-3); }
+.section-left { display: inline-flex; align-items: center; gap: 12px; }
+.chevron { width: 8px; height: 8px; border-right: 2px solid var(--hint); border-bottom: 2px solid var(--hint); transform: rotate(-45deg); transition: transform 160ms ease; }
+.section.open .chevron { transform: rotate(45deg); margin-top: -3px; }
+.pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
+.pill-progress { background:#fff0d7; color:#8a4c00; border-color:#ffd59b; }
+.pill-assigned { background:#dbe9ff; color:#25559c; border-color:#bcd2ff; }
+.pill-review { background:#ead7ff; color:#5f33a6; border-color:#d5b7ff; }
+.pill-done { background:#d9f4e3; color:#1c6b37; border-color:#bce7ca; }
+.pill-testing { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+.pill-other { background:#e9edf3; color:#53606f; border-color:#d7dde7; }
+.section-count { color: var(--hint); font-size: 13px; white-space: nowrap; }
+.section-count strong { color: var(--muted); }
+.section-body { display: none; border-top: 1px solid var(--line); }
+.section.open .section-body { display: block; }
+
+.issue { border-bottom: 1px solid var(--line); }
+.issue:last-child { border-bottom: 0; }
+.issue-row {
+  display: grid; grid-template-columns: 10px 76px minmax(0,1fr) auto; align-items: center; gap: 10px;
+  padding: 11px 18px 11px 12px; cursor: pointer; transition: background 100ms ease;
+}
+.issue-row:hover { background: var(--surface-2); }
+.issue.unread .issue-row { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.issue.unread .issue-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.issue.unread .dot { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.issue.updated .dot { background: var(--link); box-shadow: 0 0 0 3px color-mix(in srgb, var(--link) 18%, transparent); }
+.issue-id { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.issue-main { min-width: 0; }
+.issue-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13.5px; font-weight: 500; }
+.issue-title .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue.unread .issue-title .t { font-weight: 700; }
+.issue-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 12px; color: var(--hint); }
+.issue-meta .sep { opacity: 0.45; }
+.chip { display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.chip i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.changes { color: var(--link); font-weight: 600; }
+.issue-time { text-align: right; font-size: 12px; color: var(--hint); white-space: nowrap; }
+.issue-time .exp { display: inline-flex; width: 18px; height: 18px; margin-left: 8px; align-items: center; justify-content: center; border-radius: 4px; border: 1px solid var(--line-2); vertical-align: middle; transition: transform 140ms ease; }
+.issue.expanded .issue-time .exp { transform: rotate(180deg); }
+.issue-time .exp .icon { width: 12px; height: 12px; }
+
+.detail { display: none; padding: 4px 18px 18px 108px; }
+.issue.expanded .detail { display: block; }
+.detail-panel { border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); padding: 14px 16px; display: grid; gap: 14px; }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 16px; font-size: 12.5px; }
+.kv div span { display: block; color: var(--hint); font-size: 11.5px; }
+.kv div strong { font-weight: 600; color: var(--text); }
+.md-block h4 { margin: 0 0 6px; font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.md { font-size: 13px; line-height: 1.7; word-wrap: break-word; overflow-wrap: anywhere; }
+.md p { margin: 0 0 8px; }
+.md p:last-child { margin-bottom: 0; }
+.md .md-h { margin: 10px 0 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.md .md-h:first-child { margin-top: 0; }
+.md ul, .md ol { margin: 0 0 8px; padding-left: 22px; }
+.md pre { margin: 0 0 8px; padding: 10px 12px; border-radius: 7px; background: var(--bg); border: 1px solid var(--line); overflow-x: auto; font-size: 12px; line-height: 1.55; }
+.md code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; }
+.md :not(pre) > code { padding: 1px 5px; border-radius: 4px; background: var(--surface-3); }
+.notes { display: grid; gap: 8px; }
+.note { border-left: 3px solid var(--line-2); padding: 2px 0 2px 12px; }
+.note.fresh { border-left-color: var(--link); }
+.note-head { font-size: 12px; color: var(--hint); margin-bottom: 2px; }
+.note-head strong { color: var(--muted); }
+.detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.detail-actions .btn { height: 30px; font-size: 12.5px; }
+.empty-row { padding: 16px; text-align: center; color: var(--hint); font-size: 13px; }
+.empty-state { text-align: center; padding: 56px 20px; color: var(--hint); background: var(--surface); border: 1px dashed var(--line-2); border-radius: 12px; }
+.empty-state .big { font-size: 34px; margin-bottom: 6px; }
+.empty-state h3 { margin: 0 0 4px; color: var(--text); font-size: 16px; }
+.skeleton { height: 48px; border-radius: 10px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-3) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.3s infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.footer { margin-top: 22px; display: flex; justify-content: space-between; color: var(--hint); font-size: 11.5px; }
+.footer button { background: none; border: 0; padding: 0; color: var(--hint); cursor: pointer; text-decoration: underline; font-size: 11.5px; }
+mark { background: color-mix(in srgb, var(--accent) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* ---------- settings drawer ---------- */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.38); z-index: 40; opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.scrim.show { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100%); z-index: 41;
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+  transform: translateX(100%); transition: transform 200ms ease; display: flex; flex-direction: column;
+}
+.drawer.show { transform: none; }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { margin: 0; font-size: 16px; }
+.drawer-body { flex: 1; overflow-y: auto; padding: 6px 18px 24px; }
+.group-title { margin: 18px 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.6px; color: var(--hint); text-transform: uppercase; }
+.card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row .lbl { font-size: 13px; font-weight: 600; }
+.row .sub { font-size: 12px; color: var(--hint); font-weight: 400; margin-top: 1px; }
+.row > div:first-child { flex: 1; min-width: 0; }
+.row select.input { width: auto; height: 34px; min-width: 130px; max-width: 190px; flex: 0 0 auto; }
+.account { display: flex; align-items: center; gap: 12px; padding: 14px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #1b1300; background: linear-gradient(135deg, var(--bar-progress), var(--bar-review)); flex: 0 0 auto; }
+.account .who { min-width: 0; flex: 1; }
+.account .who b { display: block; }
+.account .who span { display: block; font-size: 12px; color: var(--hint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0; z-index: 60;
+  background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 9px; font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow); transition: opacity 160ms ease, transform 160ms ease; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 860px) {
+  .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .detail { padding-left: 18px; }
+  .sync-status { display: none; }
+}
+@media (max-width: 560px) {
+  .topbar-inner, .content { width: calc(100% - 24px); }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .issue-row { grid-template-columns: 10px minmax(0,1fr) auto; }
+  .issue-id { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5a623"/><stop offset="0.55" stop-color="#e8590c"/><stop offset="1" stop-color="#b07ef5"/>
+    </linearGradient>
+    <symbol id="logo" viewBox="0 0 48 48">
+      <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#g-brand)"/>
+      <rect x="13" y="10" width="22" height="28" rx="4" fill="#fff" opacity="0.96"/>
+      <rect x="19" y="7" width="10" height="6" rx="2" fill="#2c2d2a"/>
+      <path d="M17.5 20.5l2.2 2.2 4-4.2" stroke="#e8590c" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26.5 21h4.5" stroke="#2c2d2a" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M17.5 29.5l2.2 2.2 4-4.2" stroke="#e8590c" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26.5 30h4.5" stroke="#2c2d2a" stroke-width="2.2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  </defs>
+</svg>
+
+<!-- ================= LOGIN ================= -->
+<section id="login" class="hidden" aria-labelledby="login-title">
+  <div class="login-card">
+    <div class="brand">
+      <svg class="brand-mark"><use href="#logo"/></svg>
+      <div>
+        <h1 id="login-title">Mantis 小幫手</h1>
+        <p>登入 Mantis 帳號，自動彙整指派給你的項目</p>
+      </div>
+    </div>
+    <form id="login-form" class="login-form" novalidate autocomplete="on">
+      <div id="login-error" class="hidden" role="alert"></div>
+      <div class="field">
+        <label for="f-url">Mantis 網址</label>
+        <input id="f-url" class="input" type="url" placeholder="http://伺服器/mantisbt" autocomplete="url" spellcheck="false">
+        <div class="hint">可直接貼上任何 Mantis 頁面的網址（例如瀏覽器網址列上的 search.php）</div>
+      </div>
+      <div class="field" id="user-field">
+        <label for="f-user">帳號</label>
+        <input id="f-user" class="input" type="text" autocomplete="username" spellcheck="false">
+      </div>
+      <div class="field" id="pw-field">
+        <label for="f-pw">密碼</label>
+        <div class="input-wrap">
+          <input id="f-pw" class="input" type="password" autocomplete="current-password">
+          <button type="button" class="icon-btn" id="pw-toggle" aria-label="顯示密碼" title="顯示密碼"><svg class="icon"><use href="#i-eye"/></svg></button>
+        </div>
+      </div>
+      <div class="login-row">
+        <label class="check"><input id="f-remember" type="checkbox" checked> 記住我，下次自動登入</label>
+      </div>
+      <details class="adv" id="adv">
+        <summary><svg class="icon"><use href="#i-chev"/></svg>進階選項</summary>
+        <div class="adv-body">
+          <label class="check"><input id="f-usetoken" type="checkbox"> 改用 API Token 登入</label>
+          <div class="field hidden" id="token-field">
+            <label for="f-token">API Token</label>
+            <input id="f-token" class="input" type="password" autocomplete="off" spellcheck="false">
+            <div class="hint">在 Mantis「我的帳號 → API Token」建立。使用 Token 時不需要密碼。</div>
+          </div>
+          <div class="field">
+            <label for="f-mode">連線方式</label>
+            <select id="f-mode" class="input">
+              <option value="auto">自動（建議）：SOAP API，不行再改用 REST API</option>
+              <option value="soap">只用 SOAP API</option>
+              <option value="rest">只用 REST API（登入工作階段）</option>
+            </select>
+          </div>
+          <label class="check"><input id="f-insecure" type="checkbox"> 略過 HTTPS 憑證檢查（公司自簽憑證用）</label>
+        </div>
+      </details>
+      <button id="login-btn" class="btn btn-primary login-submit" type="submit">登入</button>
+    </form>
+    <div class="login-foot">密碼會以 Windows 帳戶加密保存在本機，只有你能解密。</div>
+  </div>
+</section>
+
+<!-- ================= MAIN ================= -->
+<section id="main" class="hidden">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <svg class="brand-mark"><use href="#logo"/></svg>
+        <div style="min-width:0">
+          <h1>Mantis 小幫手</h1>
+          <p id="who"></p>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="sync-status" id="sync-status" aria-live="polite"></div>
+      <button class="btn" id="refresh-btn" title="立即更新 (F5)"><svg class="icon" id="refresh-icon"><use href="#i-refresh"/></svg><span>更新</span></button>
+      <button class="icon-btn" id="settings-btn" title="設定" aria-label="設定"><svg class="icon"><use href="#i-gear"/></svg></button>
+    </div>
+  </header>
+  <div class="content">
+    <div id="banner" class="banner hidden"></div>
+    <div class="toolbar">
+      <div class="search">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input id="search" class="input" type="search" placeholder="搜尋編號、標題、專案、版本…" aria-label="搜尋">
+        <kbd>Ctrl F</kbd>
+      </div>
+      <div class="seg" role="group" aria-label="篩選">
+        <button id="f-all" aria-pressed="true">全部</button>
+        <button id="f-unread" aria-pressed="false">未讀 <span class="count" id="unread-count">0</span></button>
+      </div>
+      <select id="sort" class="input sort" aria-label="排序">
+        <option value="updated">依更新時間</option>
+        <option value="id">依項目編號</option>
+        <option value="target">依目標版本</option>
+      </select>
+      <button class="btn" id="mark-all" title="清除所有新項目/更新標記"><svg class="icon"><use href="#i-check"/></svg>全部標為已讀</button>
+    </div>
+    <div class="metric-grid" id="metrics"></div>
+    <div class="sections" id="sections"></div>
+    <div class="footer">
+      <span id="footer-left"></span>
+      <span><button id="open-data">開啟資料夾</button></span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-labelledby="settings-title" aria-hidden="true">
+  <div class="drawer-head">
+    <h2 id="settings-title">設定</h2>
+    <button class="icon-btn" id="drawer-close" aria-label="關閉"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="group-title">帳號</div>
+    <div class="card">
+      <div class="account">
+        <div class="avatar" id="avatar">?</div>
+        <div class="who"><b id="acc-name"></b><span id="acc-server"></span><span id="acc-mode"></span></div>
+        <button class="btn btn-danger" id="logout-btn">登出</button>
+      </div>
+    </div>
+
+    <div class="group-title">檢視</div>
+    <div class="card">
+      <div class="row">
+        <div><div class="lbl">要彙整的項目</div><div class="sub">也可選 Mantis 上儲存的篩選器</div></div>
+        <select class="input" id="s-scope">
+          <option value="assigned">指派給我</option>
+          <option value="reported">我回報的</option>
+          <option value="monitored">我監看的</option>
+        </select>
+      </div>
+      <div class="row">
+        <div><div class="lbl">自動檢查間隔</div></div>
+        <select class="input" id="s-interval">
+          <option value="5">每 5 分鐘</option>
+          <option value="10">每 10 分鐘</option>
+          <option value="15">每 15 分鐘</option>
+          <option value="30">每 30 分鐘</option>
+          <option value="60">每 1 小時</option>
+        </select>
+      </div>
+      <div class="row">
+        <div><div class="lbl">外觀</div></div>
+        <select class="input" id="s-theme">
+          <option value="system">跟隨系統</option>
+          <option value="dark">深色</option>
+          <option value="light">淺色</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="group-title">通知</div>
+    <div class="card">
+      <div class="row">
+        <div><div class="lbl">有新項目指派給我</div><div class="sub">Windows 通知</div></div>
+        <label class="switch"><input type="checkbox" id="s-notify-new" aria-label="新項目通知"><span></span></label>
+      </div>
+      <div class="row">
+        <div><div class="lbl">項目有更新</div><div class="sub">狀態變更、新留言、版本調整</div></div>
+        <label class="switch"><input type="checkbox" id="s-notify-upd" aria-label="更新通知"><span></span></label>
+      </div>
+      <div class="row">
+        <div><div class="lbl">測試通知</div><div class="sub">確認 Windows 有顯示通知</div></div>
+        <button class="btn" id="s-test">傳送測試</button>
+      </div>
+    </div>
+
+    <div class="group-title">啟動與背景執行</div>
+    <div class="card">
+      <div class="row">
+        <div><div class="lbl">開機時自動啟動</div><div class="sub">登入 Windows 後在系統匣背景執行</div></div>
+        <label class="switch"><input type="checkbox" id="s-autostart" aria-label="開機自動啟動"><span></span></label>
+      </div>
+      <div class="row">
+        <div><div class="lbl">關閉視窗時縮到系統匣</div><div class="sub">持續定時檢查；要完全結束請從系統匣圖示選「結束」</div></div>
+        <label class="switch"><input type="checkbox" id="s-tray" aria-label="關閉時縮到系統匣"><span></span></label>
+      </div>
+    </div>
+
+    <div class="group-title">其他</div>
+    <div class="card">
+      <div class="row">
+        <div><div class="lbl">資料與紀錄檔</div><div class="sub" id="s-datadir"></div></div>
+        <button class="btn" id="s-open-data">開啟</button>
+      </div>
+      <div class="row">
+        <div><div class="lbl">版本</div></div>
+        <span class="sub" id="s-version"></span>
+      </div>
+    </div>
+  </div>
+</aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------- bridge ----------------
+  // In the desktop app, Go binds window.mwRpc(id, method, payloadJson) and
+  // answers through window.__mwResolve; state pushes arrive via window.__mwState.
+  // In dev mode the same calls go over HTTP.
+  var pending = {}, seq = 0;
+  window.__mwResolve = function (id, ok, data) {
+    var p = pending[id]; if (!p) return; delete pending[id];
+    ok ? p.resolve(data) : p.reject(new Error(String(data)));
+  };
+  function call(method, payload) {
+    if (typeof window.mwRpc === "function") {
+      return new Promise(function (resolve, reject) {
+        var id = ++seq; pending[id] = { resolve: resolve, reject: reject };
+        window.mwRpc(id, method, JSON.stringify(payload === undefined ? null : payload));
+      });
+    }
+    return fetch("/rpc/" + method, { method: "POST", body: JSON.stringify(payload === undefined ? null : payload) })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+  }
+  window.__mwState = function (s) { render(s); };
+
+  // ---------------- helpers ----------------
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function validDate(t) { if (!t) return null; var d = new Date(t); return isNaN(d) || d.getFullYear() < 1980 ? null : d; }
+  function absTime(t) { var d = validDate(t); if (!d) return ""; return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function relTime(t) {
+    var d = validDate(t); if (!d) return "";
+    var s = (Date.now() - d.getTime()) / 1000;
+    if (s < 45) return "剛剛";
+    if (s < 3600) return Math.round(s / 60) + " 分鐘前";
+    if (s < 86400) return Math.round(s / 3600) + " 小時前";
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var diffDays = Math.round((today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    if (diffDays === 1) return "昨天 " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+    if (diffDays < 7) return diffDays + " 天前";
+    if (d.getFullYear() === today.getFullYear()) return (d.getMonth() + 1) + "/" + d.getDate();
+    return d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate();
+  }
+  function untilText(t) {
+    var d = validDate(t); if (!d) return "";
+    var s = Math.round((d.getTime() - Date.now()) / 1000);
+    if (s <= 5) return "即將自動檢查";
+    if (s < 60) return s + " 秒後自動檢查";
+    return Math.ceil(s / 60) + " 分鐘後自動檢查";
+  }
+  function versionNum(v) { var m = /\d+(?:\.\d+)*/.exec(v || ""); if (!m) return -1; var p = m[0].split("."); var n = 0; for (var i = 0; i < 4; i++) n = n * 1000 + (parseInt(p[i] || "0", 10) || 0); return n; }
+  function copyText(text) {
+    function fallback() {
+      var ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+      ta.remove(); toast(ok ? "已複製連結" : text);
+    }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { toast("已複製連結"); }, fallback);
+    else fallback();
+  }
+  ["dragover", "drop"].forEach(function (t) { window.addEventListener(t, function (e) { e.preventDefault(); }); });
+  var toastTimer;
+  function toast(msg) { var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200); }
+  function icon(name, cls) { return '<svg class="icon ' + (cls || "") + '"><use href="#' + name + '"/></svg>'; }
+  function highlight(text, q) {
+    var e = esc(text); if (!q) return e;
+    var i = text.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return e;
+    return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+  }
+
+  // Tiny, safe markdown subset for Mantis text (input is escaped first).
+  function inline(s, base) {
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[\s(（])(https?:\/\/[^\s<)）]+)/g, function (m, pre, url) { return pre + '<a href="' + url + '" data-ext="1">' + url + "</a>"; });
+    if (base) s = s.replace(/(^|[\s(（,，])#(\d{3,7})\b/g, function (m, pre, id) { return pre + '<a href="' + base + '/view.php?id=' + id + '" data-ext="1">#' + id + "</a>"; });
+    return s;
+  }
+  function md(text, base) {
+    if (!text || !String(text).trim()) return "";
+    var lines = esc(String(text).replace(/\r\n?/g, "\n")).split("\n");
+    var out = [], para = [], list = null, inCode = false, code = [];
+    function flushPara() { if (para.length) { out.push("<p>" + para.map(function (l) { return inline(l, base); }).join("<br>") + "</p>"); para = []; } }
+    function flushList() { if (list) { out.push("<" + list.type + ">" + list.items.map(function (l) { return "<li>" + inline(l, base) + "</li>"; }).join("") + "</" + list.type + ">"); list = null; } }
+    lines.forEach(function (raw) {
+      var line = raw.replace(/\s+$/, "");
+      if (/^\s*```/.test(line)) {
+        if (inCode) { out.push("<pre><code>" + code.join("\n") + "</code></pre>"); code = []; inCode = false; }
+        else { flushPara(); flushList(); inCode = true; }
+        return;
+      }
+      if (inCode) { code.push(raw); return; }
+      var m;
+      if (!line.trim()) { flushPara(); flushList(); return; }
+      if ((m = /^\s{0,3}#{1,6}\s+(.*)$/.exec(line))) { flushPara(); flushList(); out.push('<div class="md-h">' + inline(m[1], base) + "</div>"); return; }
+      if ((m = /^\s*[-*•]\s+(.*)$/.exec(line))) { flushPara(); if (!list || list.type !== "ul") { flushList(); list = { type: "ul", items: [] }; } list.items.push(m[1]); return; }
+      if ((m = /^\s*\d+[.)]\s+(.*)$/.exec(line))) { flushPara(); if (!list || list.type !== "ol") { flushList(); list = { type: "ol", items: [] }; } list.items.push(m[1]); return; }
+      flushList(); para.push(line);
+    });
+    if (inCode) out.push("<pre><code>" + code.join("\n") + "</code></pre>");
+    flushPara(); flushList();
+    return out.join("");
+  }
+
+  // ---------------- state ----------------
+  var S = null;               // last snapshot
+  var ui = { filter: "all", group: null, query: "", expanded: {}, sort: null, collapsed: null, settingsOpen: false, loginBusy: false, filtersLoaded: false };
+  var lastView = null;
+
+  function applyTheme(theme) {
+    if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
+    else document.documentElement.removeAttribute("data-theme");
+  }
+
+  function render(s) {
+    if (!s) return;
+    S = s;
+    applyTheme(s.settings.theme);
+    if (ui.sort === null) ui.sort = s.settings.sortMode || "updated";
+    if (ui.collapsed === null) ui.collapsed = Object.assign({}, s.settings.collapsed || {});
+    var view = s.view === "main" ? "main" : "login";
+    $("login").classList.toggle("hidden", view !== "login");
+    $("main").classList.toggle("hidden", view !== "main");
+    if (view === "login") renderLogin(s, lastView !== "login");
+    else renderMain(s);
+    if (ui.settingsOpen) renderSettings(s);
+    lastView = view;
+  }
+
+  // ---------------- login ----------------
+  var ERR_TITLES = { auth: "無法登入", network: "連不上伺服器", tls: "憑證問題", notMantis: "網址不正確", unavailable: "API 無法使用", server: "Mantis 回傳錯誤" };
+  function showLoginError(e) {
+    var box = $("login-error");
+    ["f-url", "f-user", "f-pw", "f-token"].forEach(function (id) { $(id).classList.remove("invalid"); });
+    if (!e) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    box.className = "alert";
+    box.innerHTML = icon("i-alert") + "<div><b>" + esc(ERR_TITLES[e.kind] || "登入失敗") + "</b>" + esc(e.message) + (e.detail ? "<small>" + esc(e.detail) + "</small>" : "") + "</div>";
+    if (e.kind === "auth") { var t = $("f-usetoken").checked ? "f-token" : "f-pw"; $(t).classList.add("invalid"); $(t).focus(); $(t).select && $(t).select(); }
+    else if (e.kind === "notMantis" || e.kind === "network" || e.kind === "tls") { $("f-url").classList.add("invalid"); }
+  }
+  function syncTokenUI() {
+    var useTok = $("f-usetoken").checked;
+    $("token-field").classList.toggle("hidden", !useTok);
+    $("pw-field").classList.toggle("hidden", useTok);
+  }
+  function renderLogin(s, first) {
+    if (first) {
+      var st = s.settings;
+      $("f-url").value = st.baseUrl || "";
+      $("f-user").value = st.username || "";
+      $("f-pw").value = "";
+      $("f-pw").placeholder = s.hasSavedPassword ? "••••••••（已儲存，可直接登入）" : "";
+      $("f-remember").checked = st.remember !== false;
+      $("f-usetoken").checked = !!st.useToken;
+      $("f-token").placeholder = s.hasSavedToken ? "（已儲存）" : "";
+      $("f-mode").value = st.authMode || "auto";
+      $("f-insecure").checked = !!st.insecure;
+      if (st.useToken || st.insecure || (st.authMode && st.authMode !== "auto")) $("adv").open = true;
+      syncTokenUI();
+      setTimeout(function () {
+        var order = ["f-url", "f-user", "f-pw"];
+        for (var i = 0; i < order.length; i++) { var el = $(order[i]); if (!el.value && !el.closest(".hidden")) { el.focus(); return; } }
+        $("login-btn").focus();
+      }, 30);
+    }
+    showLoginError(ui.loginBusy ? null : s.loginError);
+  }
+  function setLoginBusy(b) {
+    ui.loginBusy = b;
+    var btn = $("login-btn");
+    btn.disabled = b;
+    btn.innerHTML = b ? icon("i-refresh", "spin") + "連線中…" : "登入";
+    Array.prototype.forEach.call($("login-form").querySelectorAll("input,select"), function (el) { el.disabled = b; });
+  }
+  $("pw-toggle").addEventListener("click", function () {
+    var pw = $("f-pw"), show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    this.innerHTML = icon(show ? "i-eye-off" : "i-eye");
+    this.title = show ? "隱藏密碼" : "顯示密碼";
+    this.setAttribute("aria-label", this.title);
+  });
+  $("f-usetoken").addEventListener("change", syncTokenUI);
+  $("login-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    if (ui.loginBusy) return;
+    var req = {
+      baseUrl: $("f-url").value.trim(), username: $("f-user").value.trim(), password: $("f-pw").value,
+      remember: $("f-remember").checked, useToken: $("f-usetoken").checked, token: $("f-token").value.trim(),
+      authMode: $("f-mode").value, insecure: $("f-insecure").checked
+    };
+    var missing = null;
+    if (!req.baseUrl) missing = ["f-url", "請輸入 Mantis 網址"];
+    else if (!req.useToken && !req.username) missing = ["f-user", "請輸入帳號"];
+    else if (!req.useToken && !req.password && !(S && S.hasSavedPassword && req.username.toLowerCase() === (S.settings.username || "").toLowerCase())) missing = ["f-pw", "請輸入密碼"];
+    else if (req.useToken && !req.token && !(S && S.hasSavedToken)) missing = ["f-token", "請輸入 API Token"];
+    if (missing) {
+      showLoginError({ kind: "input", message: missing[1] });
+      $("login-error").querySelector("b").textContent = "資料未填完整";
+      $(missing[0]).classList.add("invalid"); $(missing[0]).focus();
+      return;
+    }
+    setLoginBusy(true);
+    call("login", req).then(function (r) {
+      setLoginBusy(false);
+      if (r && r.ok) { $("f-pw").value = ""; ui.filtersLoaded = false; return call("getState").then(render); }
+      showLoginError(r && r.error);
+    }).catch(function (e) { setLoginBusy(false); showLoginError({ kind: "server", message: String(e.message || e) }); });
+  });
+  ["f-url", "f-user", "f-pw", "f-token"].forEach(function (id) { $(id).addEventListener("input", function () { this.classList.remove("invalid"); }); });
+
+  // ---------------- main ----------------
+  var SCOPE_LABEL = { assigned: "指派給我", reported: "我回報的", monitored: "我監看的" };
+  function scopeLabel(s) { var sc = s.settings.scope || "assigned"; return SCOPE_LABEL[sc] || s.settings.scopeName || ("篩選器 #" + sc); }
+
+  function matches(it, q) {
+    if (!q) return true;
+    q = q.toLowerCase();
+    if (q.charAt(0) === "#") q = q.slice(1);
+    return [String(it.id), it.summary, it.project, it.category, it.targetVersion, it.statusLabel, it.reporter].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+  }
+  function sortItems(list) {
+    var mode = ui.sort;
+    return list.slice().sort(function (a, b) {
+      if (mode === "id") return b.id - a.id;
+      if (mode === "target") { var d = versionNum(b.targetVersion) - versionNum(a.targetVersion); if (d) return d; }
+      var t = (validDate(b.updated) || 0) - (validDate(a.updated) || 0);
+      return t || b.id - a.id;
+    });
+  }
+
+  function renderStatus(s) {
+    var el = $("sync-status");
+    if (s.syncing || s.connecting) {
+      el.innerHTML = "<strong>" + (s.connecting ? "連線中…" : "同步中…") + "</strong><span>" + esc(s.mode ? "透過 " + modeLabel(s.mode) : "") + "</span>";
+    } else if (s.syncedAt) {
+      el.innerHTML = '<strong title="' + esc(absTime(s.syncedAt)) + '">' + esc(relTime(s.syncedAt)) + "更新</strong><span>" + esc(s.nextSync ? untilText(s.nextSync) : "") + "</span>";
+    } else {
+      el.innerHTML = "<strong>尚未同步</strong><span></span>";
+    }
+    var busy = s.syncing || s.connecting;
+    $("refresh-icon").classList.toggle("spin", busy);
+    $("refresh-btn").disabled = busy;
+  }
+  function modeLabel(m) { return { soap: "SOAP API", "rest-token": "REST API（Token）", "rest-session": "REST API" }[m] || m || "—"; }
+
+  function renderMain(s) {
+    var name = s.user && (s.user.realName || s.user.name) || s.settings.username;
+    $("who").textContent = (name || "") + " · " + scopeLabel(s);
+    renderStatus(s);
+
+    // banner
+    var banner = $("banner");
+    if (s.error) {
+      banner.classList.remove("hidden");
+      banner.innerHTML = '<div class="alert">' + icon("i-alert") + '<div class="grow"><b>' + esc(ERR_TITLES[s.error.kind] || "同步失敗") + "</b>" + esc(s.error.message) +
+        (s.syncedAt ? "，目前顯示 " + esc(absTime(s.syncedAt)) + " 的資料。" : "") + '</div><button class="btn" data-act="retry">重試</button></div>';
+    } else { banner.classList.add("hidden"); banner.innerHTML = ""; }
+
+    var issues = s.issues || [];
+    var unread = s.newCount + s.updatedCount;
+    $("unread-count").textContent = unread;
+    $("unread-count").style.display = unread ? "" : "none";
+    $("mark-all").style.display = unread ? "" : "none";
+    $("f-all").setAttribute("aria-pressed", ui.filter === "all");
+    $("f-unread").setAttribute("aria-pressed", ui.filter === "unread");
+    $("sort").value = ui.sort;
+
+    var q = ui.query.trim();
+    var visible = issues.filter(function (it) { return matches(it, q) && (ui.filter !== "unread" || it.isNew || it.isUpdated); });
+
+    // metrics (counts reflect all issues; unread badges too)
+    var byGroup = {}, unreadBy = {};
+    issues.forEach(function (it) { byGroup[it.group] = (byGroup[it.group] || 0) + 1; if (it.isNew || it.isUpdated) unreadBy[it.group] = (unreadBy[it.group] || 0) + 1; });
+    $("metrics").innerHTML = s.groups.map(function (g) {
+      var n = byGroup[g.key] || 0, u = unreadBy[g.key] || 0;
+      return '<button class="metric-card' + (n ? "" : " empty") + '" style="--c:var(--bar-' + g.key + ')" data-group="' + g.key + '" aria-pressed="' + (ui.group === g.key) + '" title="只顯示「' + esc(g.label) + '」">' +
+        '<div class="metric-num">' + n + '</div><div class="metric-label">' + esc(g.label) + (u ? ' <span class="badge" title="未讀">' + u + "</span>" : "") + "</div></button>";
+    }).join("");
+
+    // sections
+    var host = $("sections");
+    if (!s.syncedAt && !issues.length) {
+      host.innerHTML = (s.syncing || s.connecting) ? '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>' :
+        '<div class="empty-state"><div class="big">⏳</div><h3>尚未取得資料</h3><div>按右上角「更新」重新同步</div></div>';
+      $("footer-left").textContent = "v" + s.version;
+      return;
+    }
+    if (!issues.length) {
+      host.innerHTML = '<div class="empty-state"><div class="big">🎉</div><h3>目前沒有項目</h3><div>「' + esc(scopeLabel(s)) + "」底下沒有任何項目，休息一下吧。</div></div>";
+      $("footer-left").textContent = "v" + s.version;
+      return;
+    }
+    var html = [];
+    var base = (s.settings.baseUrl || "").replace(/\/+$/, "");
+    s.groups.forEach(function (g) {
+      if (ui.group && ui.group !== g.key) return;
+      var items = sortItems(visible.filter(function (it) { return it.group === g.key; }));
+      var total = byGroup[g.key] || 0;
+      if (!total) return;
+      if ((q || ui.filter === "unread") && !items.length) return;
+      var open = (q || ui.filter === "unread" || ui.group) ? true : !ui.collapsed[g.key];
+      var u = items.filter(function (it) { return it.isNew || it.isUpdated; }).length;
+      html.push('<section class="section' + (open ? " open" : "") + '" data-group="' + g.key + '">' +
+        '<button class="section-header" data-act="toggle-section" aria-expanded="' + open + '"><span class="section-left"><span class="chevron"></span>' +
+        '<span class="pill pill-' + g.key + '">' + esc(g.label) + "</span>" + (u ? '<span class="badge" title="未讀">' + u + " 未讀</span>" : "") +
+        '</span><span class="section-count"><strong>' + items.length + "</strong>" + (items.length !== total ? " / " + total : "") + " 筆</span></button>" +
+        '<div class="section-body">' + (items.length ? items.map(function (it) { return issueHTML(it, q, g, base); }).join("") : '<div class="empty-row">沒有符合的項目</div>') + "</div></section>");
+    });
+    if (!html.length) html.push('<div class="empty-state"><div class="big">🔍</div><h3>找不到符合的項目</h3><div>' + (q ? "試試其他關鍵字，或" : "") + '<a href="#" data-act="clear-filters">清除篩選</a></div></div>');
+    host.innerHTML = html.join("");
+    $("footer-left").textContent = "共 " + issues.length + " 筆 · v" + s.version;
+  }
+
+  function issueHTML(it, q, g, base) {
+    var cls = "issue" + (it.isNew ? " unread" : "") + (it.isUpdated ? " updated" : "") + (ui.expanded[it.id] ? " expanded" : "");
+    var meta = [];
+    if (it.project) meta.push(highlight(it.project, q));
+    if (it.category) meta.push(esc(it.category));
+    if (it.targetVersion) meta.push("目標 " + highlight(it.targetVersion, q));
+    if (g.key === "other" || (it.statusLabel && it.statusLabel.replace(/\s/g, "") !== g.label.replace(/\s/g, "") && g.key !== "done")) {
+      meta.push('<span class="chip">' + (it.statusColor ? '<i style="background:' + esc(it.statusColor) + '"></i>' : "") + esc(it.statusLabel) + "</span>");
+    }
+    if (it.noteCount) meta.push("💬 " + it.noteCount);
+    var badges = it.isNew ? '<span class="badge badge-new">NEW</span>' : it.isUpdated ? '<span class="badge badge-upd" title="' + esc((it.changes || []).join("、")) + '">有更新</span>' : "";
+    var changes = it.isUpdated && it.changes && it.changes.length ? '<span class="changes">' + esc(it.changes.join(" · ")) + "</span>" : "";
+    return '<article class="' + cls + '" data-id="' + it.id + '">' +
+      '<div class="issue-row" data-act="toggle-issue" role="button" tabindex="0" aria-expanded="' + !!ui.expanded[it.id] + '">' +
+      '<span class="dot" aria-hidden="true"></span>' +
+      '<a class="issue-id" href="' + esc(it.url) + '" data-ext="1" title="在 Mantis 開啟">#' + highlight(String(it.id), q.replace(/^#/, "")) + "</a>" +
+      '<div class="issue-main"><div class="issue-title">' + badges + '<span class="t" title="' + esc(it.summary) + '">' + highlight(it.summary, q) + "</span></div>" +
+      '<div class="issue-meta">' + (changes ? changes + '<span class="sep">|</span>' : "") + meta.join('<span class="sep">·</span>') + "</div></div>" +
+      '<div class="issue-time" title="更新於 ' + esc(absTime(it.updated)) + '">' + esc(relTime(it.updated)) + '<span class="exp">' + icon("i-down") + "</span></div>" +
+      "</div>" + (ui.expanded[it.id] ? detailHTML(it, base) : '<div class="detail"></div>') + "</article>";
+  }
+
+  function detailHTML(it, base) {
+    function kv(label, value) { return value ? "<div><span>" + label + "</span><strong>" + esc(value) + "</strong></div>" : ""; }
+    var blocks = [];
+    var d = md(it.description, base); if (d) blocks.push('<div class="md-block"><h4>描述</h4><div class="md">' + d + "</div></div>");
+    var st = md(it.steps, base); if (st) blocks.push('<div class="md-block"><h4>重現步驟</h4><div class="md">' + st + "</div></div>");
+    var ai = md(it.additionalInfo, base); if (ai) blocks.push('<div class="md-block"><h4>附加資訊</h4><div class="md">' + ai + "</div></div>");
+    if (!blocks.length) blocks.push('<div class="md" style="color:var(--hint)">沒有描述內容。</div>');
+    var notes = "";
+    if (it.notes && it.notes.length) {
+      notes = '<div class="md-block"><h4>最近留言' + (it.noteCount > it.notes.length ? "（共 " + it.noteCount + " 則，顯示最新 " + it.notes.length + " 則）" : "") + '</h4><div class="notes">' +
+        it.notes.slice().reverse().map(function (n) {
+          return '<div class="note"><div class="note-head"><strong>' + esc(n.author) + "</strong> · " + esc(absTime(n.created)) + (n.private ? " · 🔒 私人" : "") + '</div><div class="md">' + md(n.text, base) + "</div></div>";
+        }).join("") + "</div></div>";
+    }
+    return '<div class="detail"><div class="detail-panel">' +
+      '<div class="kv">' + kv("狀態", it.statusLabel) + kv("優先順序", it.priority) + kv("嚴重性", it.severity) + kv("專案", it.project) +
+      kv("回報者", it.reporter) + kv("處理人", it.handler) + kv("目標版本", it.targetVersion) + kv("建立時間", absTime(it.created)) + kv("最後更新", absTime(it.updated)) +
+      (it.dueDate ? kv("到期日", absTime(it.dueDate)) : "") + (it.tags && it.tags.length ? kv("標籤", it.tags.join("、")) : "") + "</div>" +
+      blocks.join("") + notes +
+      '<div class="detail-actions"><a class="btn btn-primary" href="' + esc(it.url) + '" data-ext="1">' + icon("i-ext") + "在 Mantis 開啟</a>" +
+      '<button class="btn" data-act="copy-link" data-url="' + esc(it.url) + '">' + icon("i-copy") + "複製連結</button></div>" +
+      "</div></div>";
+  }
+
+  function findIssue(id) { return (S && S.issues || []).filter(function (x) { return x.id === id; })[0]; }
+  function markReadLocal(id) {
+    var it = findIssue(id);
+    if (!it || (!it.isNew && !it.isUpdated)) return;
+    if (it.isNew) S.newCount--; else S.updatedCount--;
+    it.isNew = false; it.isUpdated = false; it.changes = null;
+    call("markRead", [id]);
+  }
+  function toggleIssue(article) {
+    var id = parseInt(article.getAttribute("data-id"), 10);
+    ui.expanded[id] = !ui.expanded[id];
+    if (ui.expanded[id]) markReadLocal(id);
+    renderMain(S);
+  }
+
+  // event delegation
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest("a[data-ext], a[href^='http']");
+    if (a) { ev.preventDefault(); ev.stopPropagation(); call("openUrl", a.getAttribute("href")); if (a.classList.contains("issue-id")) { var art = a.closest(".issue"); if (art) markReadLocal(parseInt(art.getAttribute("data-id"), 10)); renderMain(S); } return; }
+    var el = ev.target.closest("[data-act], [data-group].metric-card");
+    if (!el) return;
+    var act = el.getAttribute("data-act");
+    if (el.classList.contains("metric-card")) {
+      var gk = el.getAttribute("data-group");
+      ui.group = ui.group === gk ? null : gk;
+      renderMain(S); window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (act === "toggle-section") {
+      var sec = el.closest(".section"), key = sec.getAttribute("data-group");
+      if (ui.query || ui.filter === "unread" || ui.group) { sec.classList.toggle("open"); return; }
+      ui.collapsed[key] = sec.classList.contains("open");
+      sec.classList.toggle("open"); el.setAttribute("aria-expanded", sec.classList.contains("open"));
+      call("saveSettings", { collapsed: ui.collapsed });
+    } else if (act === "toggle-issue") {
+      toggleIssue(el.closest(".issue"));
+    } else if (act === "retry") {
+      call("refresh");
+    } else if (act === "copy-link") {
+      var url = el.getAttribute("data-url");
+      copyText(url);
+    } else if (act === "clear-filters") {
+      ev.preventDefault(); ui.query = ""; $("search").value = ""; ui.filter = "all"; ui.group = null; renderMain(S);
+    }
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.classList && ev.target.classList.contains("issue-row") && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); toggleIssue(ev.target.closest(".issue")); return; }
+    if (ev.key === "F5" || (ev.ctrlKey && (ev.key === "r" || ev.key === "R"))) { ev.preventDefault(); if (S && S.view === "main") call("refresh"); return; }
+    if (!S || S.view !== "main") return;
+    if ((ev.ctrlKey && (ev.key === "f" || ev.key === "F")) || (ev.key === "/" && !/INPUT|SELECT|TEXTAREA/.test(ev.target.tagName))) { ev.preventDefault(); $("search").focus(); $("search").select(); return; }
+    if (ev.key === "Escape") {
+      if (ui.settingsOpen) { closeSettings(); return; }
+      if (document.activeElement === $("search") && $("search").value) { $("search").value = ""; ui.query = ""; renderMain(S); return; }
+    }
+  });
+  var searchTimer;
+  $("search").addEventListener("input", function () { var v = this.value; clearTimeout(searchTimer); searchTimer = setTimeout(function () { ui.query = v; renderMain(S); }, 120); });
+  $("f-all").addEventListener("click", function () { ui.filter = "all"; renderMain(S); });
+  $("f-unread").addEventListener("click", function () { ui.filter = "unread"; renderMain(S); });
+  $("sort").addEventListener("change", function () { ui.sort = this.value; renderMain(S); call("saveSettings", { sortMode: ui.sort }); });
+  $("mark-all").addEventListener("click", function () {
+    (S.issues || []).forEach(function (it) { it.isNew = false; it.isUpdated = false; it.changes = null; });
+    S.newCount = 0; S.updatedCount = 0; renderMain(S);
+    call("markAllRead"); toast("已全部標為已讀");
+  });
+  $("refresh-btn").addEventListener("click", function () { call("refresh"); });
+  $("open-data").addEventListener("click", function () { call("openDataDir"); });
+
+  // ---------------- settings ----------------
+  function openSettings() {
+    ui.settingsOpen = true;
+    $("drawer").classList.add("show"); $("scrim").classList.add("show"); $("drawer").setAttribute("aria-hidden", "false");
+    renderSettings(S, true);
+    if (!ui.filtersLoaded) {
+      ui.filtersLoaded = true;
+      call("filters").then(function (r) {
+        if (!r || !r.ok || !r.filters) return;
+        var sel = $("s-scope");
+        Array.prototype.slice.call(sel.querySelectorAll("option[data-filter]")).forEach(function (o) { o.remove(); });
+        if (r.filters.length) {
+          var og = document.createElement("optgroup"); og.label = "Mantis 已儲存的篩選器"; og.setAttribute("data-filter", "1");
+          r.filters.forEach(function (f) { var o = document.createElement("option"); o.value = String(f.id); o.textContent = f.name; o.setAttribute("data-filter", "1"); og.appendChild(o); });
+          sel.appendChild(og);
+        }
+        sel.value = S.settings.scope || "assigned";
+      }).catch(function () {});
+    }
+    setTimeout(function () { $("drawer-close").focus(); }, 50);
+  }
+  function closeSettings() {
+    ui.settingsOpen = false;
+    $("drawer").classList.remove("show"); $("scrim").classList.remove("show"); $("drawer").setAttribute("aria-hidden", "true");
+    $("settings-btn").focus();
+  }
+  function renderSettings(s, force) {
+    var name = s.user && (s.user.realName || s.user.name) || s.settings.username || "?";
+    $("avatar").textContent = name.slice(0, 1).toUpperCase();
+    $("acc-name").textContent = name + (s.user && s.user.realName && s.user.name ? "（" + s.user.name + "）" : "");
+    $("acc-server").textContent = s.settings.baseUrl;
+    $("acc-mode").textContent = "連線方式：" + modeLabel(s.mode);
+    $("s-version").textContent = "v" + s.version;
+    $("s-datadir").textContent = s.dataDir;
+    if (force) {
+      var sc = $("s-scope"), scope = s.settings.scope || "assigned";
+      if (!Array.prototype.some.call(sc.options, function (o) { return o.value === scope; })) { var o = document.createElement("option"); o.value = scope; o.textContent = s.settings.scopeName || ("篩選器 #" + scope); o.setAttribute("data-filter", "1"); sc.appendChild(o); }
+      sc.value = scope;
+      var iv = $("s-interval"), ivv = String(s.settings.intervalMin);
+      if (!Array.prototype.some.call(iv.options, function (o) { return o.value === ivv; })) { var o2 = document.createElement("option"); o2.value = ivv; o2.textContent = "每 " + ivv + " 分鐘"; iv.appendChild(o2); }
+      iv.value = ivv;
+      $("s-theme").value = s.settings.theme || "system";
+      $("s-notify-new").checked = !!s.settings.notifyNew;
+      $("s-notify-upd").checked = !!s.settings.notifyUpdates;
+      $("s-autostart").checked = !!s.autostart;
+      $("s-tray").checked = s.settings.closeToTray !== false;
+    }
+  }
+  function save(patch, msg) {
+    call("saveSettings", patch).then(function (r) { if (r && r.ok === false) toast(r.error.message); else if (msg) toast(msg); });
+  }
+  $("settings-btn").addEventListener("click", openSettings);
+  $("drawer-close").addEventListener("click", closeSettings);
+  $("scrim").addEventListener("click", closeSettings);
+  $("s-scope").addEventListener("change", function () { var o = this.options[this.selectedIndex]; save({ scope: this.value, scopeName: SCOPE_LABEL[this.value] ? "" : o.textContent }, "已切換，正在重新整理…"); });
+  $("s-interval").addEventListener("change", function () { save({ intervalMin: parseInt(this.value, 10) }, "已更新檢查間隔"); });
+  $("s-theme").addEventListener("change", function () { applyTheme(this.value); save({ theme: this.value }); });
+  $("s-notify-new").addEventListener("change", function () { save({ notifyNew: this.checked }); });
+  $("s-notify-upd").addEventListener("change", function () { save({ notifyUpdates: this.checked }); });
+  $("s-autostart").addEventListener("change", function () { save({ autostart: this.checked }, this.checked ? "已設定開機自動啟動" : "已取消開機自動啟動"); });
+  $("s-tray").addEventListener("change", function () { save({ closeToTray: this.checked }); });
+  $("s-test").addEventListener("click", function () { call("testNotification"); toast("已送出測試通知"); });
+  $("s-open-data").addEventListener("click", function () { call("openDataDir"); });
+  $("logout-btn").addEventListener("click", function () {
+    closeSettings(); ui.expanded = {}; ui.filtersLoaded = false;
+    call("logout").then(function () { return call("getState"); }).then(render);
+  });
+
+  // keep relative times fresh
+  setInterval(function () { if (S && S.view === "main") renderStatus(S); }, 15000);
+  setInterval(function () { if (S && S.view === "main" && !document.querySelector(".issue.expanded")) renderMain(S); }, 60000);
+
+  if (typeof window.mwRpc !== "function" && window.EventSource) {
+    // dev mode: server pushes "changed" events
+    new EventSource("/events").onmessage = function () { call("getState").then(render); };
+  }
+  call("getState").then(render).catch(function (e) { document.body.insertAdjacentHTML("afterbegin", '<div class="alert" style="margin:16px">' + esc(e.message) + "</div>"); });
+})();
+</script>
+</body>
+</html>
